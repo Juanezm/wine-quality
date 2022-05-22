@@ -3,6 +3,15 @@ title: 'PRA2: Limpieza y análisis de datos'
 author: "Juan Emilio Zurita Macías"
 date: '`r format(Sys.Date(),"%e de %B, %Y")`'
 output:
+  rmarkdown::github_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    fig_width: 9
+    fig_height: 7
+  pdf_document:
+    toc: yes
+    number_sections: true
   html_document: 
     theme: cosmo
     toc: yes
@@ -11,9 +20,6 @@ output:
     fig_width: 9
     fig_height: 7
     fig_caption: yes
-  pdf_document:
-    toc: yes
-    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
