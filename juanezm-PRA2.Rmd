@@ -1,0 +1,343 @@
+---
+title: 'PRA2: Limpieza y análisis de datos'
+author: "Juan Emilio Zurita Macías"
+date: '`r format(Sys.Date(),"%e de %B, %Y")`'
+output:
+  html_document: 
+    theme: cosmo
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    fig_width: 9
+    fig_height: 7
+    fig_caption: yes
+  pdf_document:
+    toc: yes
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval=T, echo=T)
+```
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+
+if (!require('reshape')) install.packages('reshape')
+if (!require('ggplot2')) install.packages('ggplot2')
+if (!require('dplyr')) install.packages('dplyr')
+if (!require('tidyverse')) install.packages('tidyverse')
+if (!require('ggpubr')) install.packages('ggpubr')
+if (!require('corrplot')) install.packages('corrplot')
+if (!require('RColorBrewer')) install.packages('RColorBrewer')
+if (!require('ResourceSelection')) install.packages('ResourceSelection')
+if (!require('pROC')) install.packages('pROC')
+```
+
+# Descripción del dataset.
+
+El dataset está relacionado a la variante "Vinho Verde" portugués y contiene una serie de componentes fisioquimicos que pueden ser tratados como variables de entrada además de una variable `quality` que define con número entero del 0 al 10 la calidad de cada observación.
+
+|Variable |	Descripción | Unidades |
+|---------|-------------|---------|
+| `fixed.acidity` (acidez fija) | refiere al conjunto de los ácidos naturales procedentes de la uva (tartárico, málico, cítrico y succínico) o formados en la fermentación maloláctica (láctico) | g(tartaric acid)/dm<sup>3</sup> |
+| `volatile.acidity` (acidez volátil) | refiere al conjunto de ácidos formados durante la fermentación o como consecuencia de alteraciones microbianas. | g(tartaric acid)/dm<sup>3</sup> |
+| `citric.acid` (ácido cítrico) |  es un acidificante para corregir la acidez y además posee una acción estabilizante | g/dm<sup>3</sup> |
+| `residual.sugar` (azúcar residual) | es la cantidad total de azúcar que queda en el vino que no ha sido fermentada por las levaduras | g/dm<sup>3</sup> |
+| `chlorides` (clorurlos) |  son aniones derivados del cloruro de hidrógeno | g(tartaric acid)/dm<sup>3</sup> |
+| `free.sulfur.dioxide` (dióxido de azufre libre) | se utiliza en enología principalmente como conservante, pero también para otros fines (por ejemplo, para funciones antisépticas, antioxidantes, antioxidasicas, solubilizantes, combinadas y clarificantes) | mg/dm<sup>3</sup> |
+| `total.sulfur.dioxide` (dióxido de azufre total) | se utiliza en enología principalmente como conservante, pero también para otros fines (por ejemplo, para funciones antisépticas, antioxidantes, antioxidasicas, solubilizantes, combinadas y clarificantes) | mg/dm<sup>3</sup> |
+| `density` (densidad) | es una magnitud escalar referida a la cantidad de masa en un determinado volumen de una sustancia o un objeto sólido | g/cm<sup>3</sup> |
+| `pH` | es una medida de acidez o alcalinidad de una disolución acuosa | - |
+| `sulphates` (sulfitos) |  se encargan de neutralizar las levaduras propias de la viña, así como bacterias acéticas y lácticas que pueden provocar que el vino se avinagre | g(tartaric acid)/dm<sup>3</sup> |
+| `alcohol` | Compuesto de carbono, hidrógeno y oxígeno que deriva de los hidrocarburos y lleva en su molécula uno o varios hidroxilos (OH) | % vol. |
+| `quality` (calidad) | - | - |
+
+
+¿Por qué es importante y qué pregunta/problema pretende responder?
+
+Este conjunto de datos pretende responder preguntas tales como, que componentes fisioquímicos afectan en mayor medida a la calidad del vino y con ellos incluso llegar a construir un modelo que permita predecir la calidad de un vino en función de éstos.
+
+# Integración y selección de los datos de interés a analizar.
+
+Puede ser el resultado de adicionar diferentes datasets o una subselección útil de los datos originales, en base al objetivo que se quiera conseguir.
+
+Procedemos a la lectura de los datos que se encuentran en formato CSV
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+winequality <- read.csv("winequality-red.csv")
+```
+
+Comprobamos que tipo de datos tiene y las primeras entradas del dataset
+
+```{r}
+str(winequality)
+```
+
+Realizamos un summary para extraer estadísticos de cada variable
+
+```{r}
+summary(winequality)
+```
+
+Como no sabemos que elementos son más relevantes, no vamos a descartar ninguna variable, por lo que podemos proceder a su limpieza con el dataset completo.
+
+# Limpieza de los datos.
+
+## ¿Los datos contienen ceros o elementos vacíos? Gestiona cada uno de estos casos.
+
+No parece haber elementos vacíos en este conjunto de datos, y solo hay una única variable que contiene valores cero (ácido cítrico) y parece corresponder con un valor válido. 
+
+## Identifica y gestiona los valores extremos.
+
+Para comprobar la posible presencia de outliers, representamos el mediante boxplots la distribución de valores de cada variable.
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+library(reshape)
+library(ggplot2)
+
+ggplot(melt(winequality), aes(factor(variable), value)) +
+  geom_boxplot() + facet_wrap(~variable, scale="free")
+```
+
+Se puede observar una gran presencia de outliers en variables como `total.sulfur.dioxide`, `chlorides` o `sulphates.` Se procederá a mirar de cerca cada uno de ellos y descartar valores que estén muy por encima de su mediana.
+
+```{r}
+winequality.clean <- winequality
+```
+
+En el caso de `total.sulfur.dioxide`, podemos considerar outliers ese par de valores que sobresalen por encima de 200.
+
+```{r}
+winequality.clean$total.sulfur.dioxide[winequality$total.sulfur.dioxide > 200] <- NA
+boxplot(winequality$total.sulfur.dioxide, winequality.clean$total.sulfur.dioxide, main="total.sulfur.dioxide", names = c("antes", "después"))
+```
+
+En el caso de `chlorides`, podemos considerar outliers ese valor que sobresale por encima de 0.5.
+
+```{r}
+winequality.clean$chlorides[winequality$chlorides > 0.5] <- NA
+boxplot(winequality$chlorides, winequality.clean$chlorides, main="chlorides", names = c("antes", "después"))
+```
+
+En el caso de `sulphates`, podemos considerar outliers ese par de grupos de valores que sobresalen por encima de 1.5.
+
+```{r}
+winequality.clean$sulphates[winequality$sulphates > 1.5] <- NA
+boxplot(winequality$sulphates, winequality.clean$sulphates, main="sulphates", names = c("antes", "después"))
+```
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+library(dplyr)
+library(tidyverse)
+
+winequality.clean <- winequality.clean %>% 
+  drop_na() %>% 
+  unique()
+```
+
+Comprobamos cuanto se ha reducido el dataset después de realizar la limpieza
+
+```{r}
+nrow(winequality.clean)/nrow(winequality) * 100
+```
+Se han descartado en torno al 16% de las observaciones del dataset original tras eliminar valores duplicados o outliers.
+
+```{r}
+summary(winequality.clean)
+```
+
+# Análisis de los datos
+
+## Selección de los grupos de datos que se quieren analizar/comparar.
+
+p. e., si se van a comparar grupos de datos, ¿cuáles son estos grupos y qué tipo de análisis se van a aplicar?.
+
+Para nuestro análisis, vamos a crear una nueva variable binaria basándonos en la variable `quality`. Esta variable determinará si se trata de un buen vino (bajo el criterio de una nota de corte mayor o igual a 6) o de un vino mediocre.
+
+```{r}
+winequality.clean$buen.vino <- ifelse(winequality.clean$quality >= 6, TRUE, FALSE)
+```
+
+Como en este punto aún no tenemos claro que variables vamos a analizar (dependerá de análisis posteriores como la correlación), no vamos a realizar ninguna selección de momento.
+
+## Comprobación de la normalidad y homogeneidad de la varianza.
+
+Si consideramos la aplicación del teorema del límite central (TLC), podemos concluir que para muestras suficientemente grandes de la población, aunque la población original no siga una distribución normal, la media se aproxima a una distribución normal. Esto será útil por si queremos hacer algún contraste de medias en nuestro análisis.
+
+Sin embargo, se ha diseñado la siguiente función, que para un dataframe dado, realiza tanto un diagrama de densidad como Q-Q, además de el test de Saphiro-Wilk para una submuestra aleatoria de 50 elementos de cada variable.
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+library(ggpubr)
+
+test.normalidad <- function(dataframe, NC){
+  alpha <- 1 - NC
+  
+  for(var in colnames(dataframe)) {
+    if(is.numeric(dataframe[, var])) {
+      
+      # Diagrama de densidad
+      print(ggdensity(dataframe[, var], 
+            main = "Diagrama de densidad",
+            xlab = var))
+      
+      # Diagrama Q-Q
+      print(ggqqplot(dataframe[, var]))
+      
+      # Test de Saphiro-Wilk
+      set.seed(1)
+      pvalue <- shapiro.test(sample(dataframe[, var], 50))$p.value
+      
+      if(pvalue > alpha){
+        print(sprintf("Según el test de Saphiro-Wilk como el valor p (%s) es mayor a alfa (%s) no se rechaza la hipótesis nula (H0), por lo tanto, la variable %s presenta un comportamiento normal o paramétrico.", round(pvalue, 4), alpha, var))
+      }
+      else{
+        print(sprintf("Según el test de Saphiro-Wilk como el valor p (%s) es menor a alfa (%s) se rechaza la hipótesis nula (H0), por lo tanto, la variable %s presenta un comportamiento NO normal.", round(pvalue, 4), alpha, var))
+      }
+    }
+    else{
+      message(sprintf("%s - no es numérica.", var))
+    }
+  }
+}
+```
+
+```{r}
+test.normalidad(dataframe = winequality.clean, NC = 0.95)
+```
+
+El cálculo de homogeneidad de varianzas se realizará en el apartado correspondiente al análisis de contraste de hipótesis.
+
+## Aplicación de pruebas estadísticas para comparar los grupos de datos.
+
+En función de los datos y el objetivo del estudio, aplicar pruebas de contraste de hipótesis, correlaciones, regresiones, etc. Aplicar al menos tres métodos de análisis diferentes.
+
+### ¿Qué componentes fisioquimicos influyen en la calidad del vino?
+
+Para responder a la primera pregunta de nuestro análisis, vamos a hacer uso de la correlación por el método de Spearman
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+library(corrplot)
+library(RColorBrewer)
+
+corrplot(cor(winequality.clean[,-12], method = "spearman"),
+         title = "Matriz de correlación de winequality", mar = c(0,0,1,0),
+         method = "color", addCoef.col = "black",
+         tl.srt = 45, tl.col = "black", 
+         col = brewer.pal(n = 8, name = "RdBu"),
+         type = "lower")
+```
+
+Como el objetivo de este análisis es obtener los elementos que más influyen en la calidad de un vino, vamos a extraer el vector de correlación de la variable `buen.vino` y vamos a representar gráficamente de forma ordenada sus valores absolutos.
+
+```{r}
+corr.buen.vino <- cor(winequality.clean[,-12], method = "spearman")[,"buen.vino"][1:11]
+par(mar = c(3, 9, 2, 2))
+barplot(sort(abs(corr.buen.vino)), 
+        main = "Correlación ordenada con buen.vino", 
+        horiz = TRUE, 
+        las = 2, 
+        col = brewer.pal(n = 11, name = "RdBu")
+        )
+```
+
+De esta forma podemos ver claramente que los tres elementos que más influyen en la calidad del vino son el `alcohol`, `sulphates` y `volatile.acidity`.
+
+
+### ¿Es la media de alcohol de un buen vino $\mu_{1}$ superior a la media de alcohol de un vino mediocre $\mu_{2}$?
+
+Deribado del análisis anterior, se ha obtenido que el elemento que más influye en la calidad del vino es el alcohol, y queremos saber si la media de alcohol de un buen vino es superior a la de un vino mediocre.
+
+\begin{align*}
+& H_{0}: \mu_{1}=\mu_{2} \\
+& H_{1}: \mu_{1}>\mu_{2}
+\end{align*}
+
+```{r}
+alcohol.buen.vino <- winequality.clean[winequality.clean$buen.vino == TRUE, ]$alcohol
+alcohol.vino.mediocre <- winequality.clean[winequality.clean$buen.vino == FALSE, ]$alcohol
+```
+
+Dado que ambas muestras son lo suficientemente grandes como para asumir normalidad (por el Teorema Central del Límite), procedemos directamente a comprobar la homogeneidad de varianza.
+
+```{r}
+var.test(alcohol.buen.vino, alcohol.vino.mediocre)
+```
+
+Al obtener un valor p tan bajo, podemos concluir que las varianzas de ambas poblaciones son diferentes.
+
+Vamos a realizar el cálculo del contraste de dos muestras independientes sobre la media con varianzas desconocidas diferentes.
+
+```{r}
+t.test(alcohol.buen.vino, alcohol.vino.mediocre, alternative = "greater", var.equal = FALSE)
+```
+
+Podemos concluir, al tratarse de un test unilateral por la derecha, que el valor observado para un nivel de confianza del 95% es mayor que el valor crítico, y el valor p es menor que el nivel de significancia, por lo tanto podemos rechazar la hipótesis nula ($H_{0}$) y aceptar la hipótesis alternativa ($H_{1}$) de que la media de alcohol de un buen vino es mayor a la media de alcohol de un vino mediocre.
+
+
+### Modelo de Regresión
+
+A continuación vamos a proceder a modelar la calidad de un vino en función del valor de solamente 3 de sus elementos fisioquímicos.
+
+Para ello comenzamos con una simple regresión lineal, tomando como variable dependiente `quality` y como variables explicativas `alcohol`, `sulphates` y `volatile.acidity`.
+
+```{r}
+regresion.multiple <- lm(quality ~ alcohol + sulphates + volatile.acidity, data = winequality.clean)
+summary(regresion.multiple)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(regresion.multiple)
+```
+
+Como podemos observar, los resultados obtenidos no son muy buenos, y esto es debido a la distribución de la variable `quality`.
+
+Para mejorar esto, vamos a proceder con una regresión logística usando las mismas variables explicativas que para el modelo lineal, pero tomando la variable binaria `buen.vino` en vez de `quality`.
+
+```{r}
+regresion.logistica.multiple <- glm(buen.vino ~ alcohol + sulphates + volatile.acidity, data=winequality.clean, family=binomial(link=logit))
+summary(regresion.logistica.multiple)
+```
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+library(ResourceSelection)
+
+hoslem.test(winequality.clean$buen.vino, fitted(regresion.logistica.multiple))
+```
+
+Un valor p alto sugiere una buena bondad de ajuste.
+
+```{r echo=FALSE, message= FALSE, warning=FALSE}
+library(pROC)
+
+prob <- regresion.logistica.multiple %>% predict(winequality.clean, type="response")
+r <- roc(winequality.clean$buen.vino, prob, data = winequality.clean)
+plot(r)
+auc(r)
+```
+
+El valor del área bajo la curva (AUROC) sugiere que en general el modelo discrimina de manera excelente.
+
+Esta vez parece que el modelo es capaz de responder con una buena bondad de ajuste y una discriminación excelente, si se trata de un buen vino o no dados los valores de `alcohol`, `sulphates` y `volatile.acidity`.
+
+
+Podemos incluso hacer una prediccion de los primeros 5 elementos del dataset para ver con que porcentaje nuestro modelo es capaz de predecir si se trata de un buen vino o no.
+
+```{r}
+head(winequality.clean[c("alcohol", "sulphates", "volatile.acidity", "buen.vino")]) %>%
+  mutate(prediccion.buen.vino = predict(regresion.logistica.multiple, 
+                                        data.frame(alcohol = alcohol, 
+                                                   sulphates = sulphates, 
+                                                   volatile.acidity = volatile.acidity), 
+                                        type="response")
+         )
+```
+
+
+# Resolución del problema.
+
+A partir de los resultados obtenidos, ¿cuáles son las conclusiones? ¿Los resultados permiten responder al problema?
+
+
+Dados los resultados del primer análisis de correlación pudimos extraer los 3 componentes que más afectan a la calidad del vino obteniendo como resultado el alcohol, sulfitos y acidez volátil. Luego mediante un análisis de contraste de hipótesis pudimos responder a la pregunta de si un buen vino suele tener mayor cantidad de alcohol, y la respuesta fue afirmativa, el alcohol como elemento principal para definir la calidad de un vino, se suele encontrar en mayores niveles de éste en un buen vino que en un vino mediocre. Y para finalizar, dados los resultados del análisis de regresión son que podemos determinar con un buen nivel de precisión si se trata de un buen vino o no, haciendo uso de solamente 3 componentes fisioquímicos.
+
