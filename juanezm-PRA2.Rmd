@@ -339,6 +339,12 @@ head(winequality.clean[c("alcohol", "sulphates", "volatile.acidity", "buen.vino"
          )
 ```
 
+Finalmente guardamos el dataset que se ha limpiado y usado para el análisis, en formato CSV.
+
+```{r}
+write.csv(winequality.clean,"winequality-red-clean.csv", row.names = FALSE)
+```
+
 
 # Resolución del problema.
 
