@@ -1,7 +1,7 @@
 PRA2: Limpieza y análisis de datos
 ================
 Juan Emilio Zurita Macías
-22 de May, 2022
+30 de May, 2022
 
 -   [1 Descripción del dataset.](#descripción-del-dataset)
 -   [2 Integración y selección de los datos de interés a
@@ -511,6 +511,13 @@ head(winequality.clean[c("alcohol", "sulphates", "volatile.acidity", "buen.vino"
     ## 4     9.8      0.58             0.28      TRUE            0.5452182
     ## 6     9.4      0.56             0.66     FALSE            0.1933883
     ## 7     9.4      0.46             0.60     FALSE            0.1821718
+
+Finalmente guardamos el dataset que se ha limpiado y usado para el
+análisis, en formato CSV.
+
+``` r
+write.csv(winequality.clean,"winequality-red-clean.csv", row.names = FALSE)
+```
 
 # 5 Resolución del problema.
 
