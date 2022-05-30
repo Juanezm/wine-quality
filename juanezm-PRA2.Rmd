@@ -3,15 +3,15 @@ title: 'PRA2: Limpieza y análisis de datos'
 author: "Juan Emilio Zurita Macías"
 date: '`r format(Sys.Date(),"%e de %B, %Y")`'
 output:
+  pdf_document:
+    toc: yes
+    number_sections: true
   rmarkdown::github_document:
     toc: yes
     toc_depth: 2
     number_sections: yes
     fig_width: 9
     fig_height: 7
-  pdf_document:
-    toc: yes
-    number_sections: true
   html_document: 
     theme: cosmo
     toc: yes
@@ -26,7 +26,7 @@ output:
 knitr::opts_chunk$set(eval=T, echo=T)
 ```
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 
 if (!require('reshape')) install.packages('reshape')
 if (!require('ggplot2')) install.packages('ggplot2')
@@ -69,7 +69,7 @@ Puede ser el resultado de adicionar diferentes datasets o una subselección úti
 
 Procedemos a la lectura de los datos que se encuentran en formato CSV
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 winequality <- read.csv("winequality-red.csv")
 ```
 
@@ -97,7 +97,7 @@ No parece haber elementos vacíos en este conjunto de datos, y solo hay una úni
 
 Para comprobar la posible presencia de outliers, representamos el mediante boxplots la distribución de valores de cada variable.
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 library(reshape)
 library(ggplot2)
 
@@ -132,7 +132,7 @@ winequality.clean$sulphates[winequality$sulphates > 1.5] <- NA
 boxplot(winequality$sulphates, winequality.clean$sulphates, main="sulphates", names = c("antes", "después"))
 ```
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 library(dplyr)
 library(tidyverse)
 
@@ -156,7 +156,7 @@ summary(winequality.clean)
 
 ## Selección de los grupos de datos que se quieren analizar/comparar.
 
-p. e., si se van a comparar grupos de datos, ¿cuáles son estos grupos y qué tipo de análisis se van a aplicar?.
+Por ejemplo, si se van a comparar grupos de datos, ¿cuáles son estos grupos y qué tipo de análisis se van a aplicar?.
 
 Para nuestro análisis, vamos a crear una nueva variable binaria basándonos en la variable `quality`. Esta variable determinará si se trata de un buen vino (bajo el criterio de una nota de corte mayor o igual a 6) o de un vino mediocre.
 
@@ -172,7 +172,7 @@ Si consideramos la aplicación del teorema del límite central (TLC), podemos co
 
 Sin embargo, se ha diseñado la siguiente función, que para un dataframe dado, realiza tanto un diagrama de densidad como Q-Q, además de el test de Saphiro-Wilk para una submuestra aleatoria de 50 elementos de cada variable.
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 library(ggpubr)
 
 test.normalidad <- function(dataframe, NC){
@@ -221,7 +221,7 @@ En función de los datos y el objetivo del estudio, aplicar pruebas de contraste
 
 Para responder a la primera pregunta de nuestro análisis, vamos a hacer uso de la correlación por el método de Spearman
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 library(corrplot)
 library(RColorBrewer)
 
@@ -305,7 +305,7 @@ regresion.logistica.multiple <- glm(buen.vino ~ alcohol + sulphates + volatile.a
 summary(regresion.logistica.multiple)
 ```
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 library(ResourceSelection)
 
 hoslem.test(winequality.clean$buen.vino, fitted(regresion.logistica.multiple))
@@ -313,7 +313,7 @@ hoslem.test(winequality.clean$buen.vino, fitted(regresion.logistica.multiple))
 
 Un valor p alto sugiere una buena bondad de ajuste.
 
-```{r echo=FALSE, message= FALSE, warning=FALSE}
+```{r message= FALSE, warning=FALSE}
 library(pROC)
 
 prob <- regresion.logistica.multiple %>% predict(winequality.clean, type="response")
@@ -350,6 +350,9 @@ write.csv(winequality.clean,"winequality-red-clean.csv", row.names = FALSE)
 
 A partir de los resultados obtenidos, ¿cuáles son las conclusiones? ¿Los resultados permiten responder al problema?
 
+Dados los resultados del primer análisis de correlación pudimos extraer los 3 componentes que más afectan a la calidad del vino obteniendo como resultado el alcohol, sulfitos y acidez volátil. 
 
-Dados los resultados del primer análisis de correlación pudimos extraer los 3 componentes que más afectan a la calidad del vino obteniendo como resultado el alcohol, sulfitos y acidez volátil. Luego mediante un análisis de contraste de hipótesis pudimos responder a la pregunta de si un buen vino suele tener mayor cantidad de alcohol, y la respuesta fue afirmativa, el alcohol como elemento principal para definir la calidad de un vino, se suele encontrar en mayores niveles de éste en un buen vino que en un vino mediocre. Y para finalizar, dados los resultados del análisis de regresión son que podemos determinar con un buen nivel de precisión si se trata de un buen vino o no, haciendo uso de solamente 3 componentes fisioquímicos.
+Luego mediante un análisis de contraste de hipótesis pudimos responder a la pregunta de si un buen vino suele tener mayor cantidad de alcohol, y la respuesta fue afirmativa, el alcohol como elemento principal para definir la calidad de un vino, se suele encontrar en mayores niveles de éste en un buen vino que en un vino mediocre. 
+
+Y para finalizar, dados los resultados del análisis de regresión son que podemos determinar con un buen nivel de precisión si se trata de un buen vino o no, haciendo uso de solamente 3 componentes fisioquímicos.
 

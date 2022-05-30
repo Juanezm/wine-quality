@@ -22,6 +22,18 @@ Juan Emilio Zurita Macías
         datos.](#aplicación-de-pruebas-estadísticas-para-comparar-los-grupos-de-datos)
 -   [5 Resolución del problema.](#resolución-del-problema)
 
+``` r
+if (!require('reshape')) install.packages('reshape')
+if (!require('ggplot2')) install.packages('ggplot2')
+if (!require('dplyr')) install.packages('dplyr')
+if (!require('tidyverse')) install.packages('tidyverse')
+if (!require('ggpubr')) install.packages('ggpubr')
+if (!require('corrplot')) install.packages('corrplot')
+if (!require('RColorBrewer')) install.packages('RColorBrewer')
+if (!require('ResourceSelection')) install.packages('ResourceSelection')
+if (!require('pROC')) install.packages('pROC')
+```
+
 # 1 Descripción del dataset.
 
 El dataset está relacionado a la variante “Vinho Verde” portugués y
@@ -58,6 +70,10 @@ subselección útil de los datos originales, en base al objetivo que se
 quiera conseguir.
 
 Procedemos a la lectura de los datos que se encuentran en formato CSV
+
+``` r
+winequality <- read.csv("winequality-red.csv")
+```
 
 Comprobamos que tipo de datos tiene y las primeras entradas del dataset
 
@@ -124,6 +140,14 @@ corresponder con un valor válido.
 Para comprobar la posible presencia de outliers, representamos el
 mediante boxplots la distribución de valores de cada variable.
 
+``` r
+library(reshape)
+library(ggplot2)
+
+ggplot(melt(winequality), aes(factor(variable), value)) +
+  geom_boxplot() + facet_wrap(~variable, scale="free")
+```
+
 ![](juanezm-PRA2_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 Se puede observar una gran presencia de outliers en variables como
@@ -164,6 +188,15 @@ boxplot(winequality$sulphates, winequality.clean$sulphates, main="sulphates", na
 ```
 
 ![](juanezm-PRA2_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
+library(dplyr)
+library(tidyverse)
+
+winequality.clean <- winequality.clean %>% 
+  drop_na() %>% 
+  unique()
+```
 
 Comprobamos cuanto se ha reducido el dataset después de realizar la
 limpieza
@@ -207,8 +240,8 @@ summary(winequality.clean)
 
 ## 4.1 Selección de los grupos de datos que se quieren analizar/comparar.
 
-16. e., si se van a comparar grupos de datos, ¿cuáles son estos grupos y
-    qué tipo de análisis se van a aplicar?.
+Por ejemplo, si se van a comparar grupos de datos, ¿cuáles son estos
+grupos y qué tipo de análisis se van a aplicar?.
 
 Para nuestro análisis, vamos a crear una nueva variable binaria
 basándonos en la variable `quality`. Esta variable determinará si se
@@ -235,6 +268,41 @@ Sin embargo, se ha diseñado la siguiente función, que para un dataframe
 dado, realiza tanto un diagrama de densidad como Q-Q, además de el test
 de Saphiro-Wilk para una submuestra aleatoria de 50 elementos de cada
 variable.
+
+``` r
+library(ggpubr)
+
+test.normalidad <- function(dataframe, NC){
+  alpha <- 1 - NC
+  
+  for(var in colnames(dataframe)) {
+    if(is.numeric(dataframe[, var])) {
+      
+      # Diagrama de densidad
+      print(ggdensity(dataframe[, var], 
+            main = "Diagrama de densidad",
+            xlab = var))
+      
+      # Diagrama Q-Q
+      print(ggqqplot(dataframe[, var]))
+      
+      # Test de Saphiro-Wilk
+      set.seed(1)
+      pvalue <- shapiro.test(sample(dataframe[, var], 50))$p.value
+      
+      if(pvalue > alpha){
+        print(sprintf("Según el test de Saphiro-Wilk como el valor p (%s) es mayor a alfa (%s) no se rechaza la hipótesis nula (H0), por lo tanto, la variable %s presenta un comportamiento normal o paramétrico.", round(pvalue, 4), alpha, var))
+      }
+      else{
+        print(sprintf("Según el test de Saphiro-Wilk como el valor p (%s) es menor a alfa (%s) se rechaza la hipótesis nula (H0), por lo tanto, la variable %s presenta un comportamiento NO normal.", round(pvalue, 4), alpha, var))
+      }
+    }
+    else{
+      message(sprintf("%s - no es numérica.", var))
+    }
+  }
+}
+```
 
 ``` r
 test.normalidad(dataframe = winequality.clean, NC = 0.95)
@@ -305,6 +373,18 @@ menos tres métodos de análisis diferentes.
 
 Para responder a la primera pregunta de nuestro análisis, vamos a hacer
 uso de la correlación por el método de Spearman
+
+``` r
+library(corrplot)
+library(RColorBrewer)
+
+corrplot(cor(winequality.clean[,-12], method = "spearman"),
+         title = "Matriz de correlación de winequality", mar = c(0,0,1,0),
+         method = "color", addCoef.col = "black",
+         tl.srt = 45, tl.col = "black", 
+         col = brewer.pal(n = 8, name = "RdBu"),
+         type = "lower")
+```
 
 ![](juanezm-PRA2_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
@@ -471,6 +551,12 @@ summary(regresion.logistica.multiple)
     ## 
     ## Number of Fisher Scoring iterations: 4
 
+``` r
+library(ResourceSelection)
+
+hoslem.test(winequality.clean$buen.vino, fitted(regresion.logistica.multiple))
+```
+
     ## 
     ##  Hosmer and Lemeshow goodness of fit (GOF) test
     ## 
@@ -479,7 +565,19 @@ summary(regresion.logistica.multiple)
 
 Un valor p alto sugiere una buena bondad de ajuste.
 
+``` r
+library(pROC)
+
+prob <- regresion.logistica.multiple %>% predict(winequality.clean, type="response")
+r <- roc(winequality.clean$buen.vino, prob, data = winequality.clean)
+plot(r)
+```
+
 ![](juanezm-PRA2_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+
+``` r
+auc(r)
+```
 
     ## Area under the curve: 0.812
 
@@ -526,12 +624,14 @@ resultados permiten responder al problema?
 
 Dados los resultados del primer análisis de correlación pudimos extraer
 los 3 componentes que más afectan a la calidad del vino obteniendo como
-resultado el alcohol, sulfitos y acidez volátil. Luego mediante un
-análisis de contraste de hipótesis pudimos responder a la pregunta de si
-un buen vino suele tener mayor cantidad de alcohol, y la respuesta fue
-afirmativa, el alcohol como elemento principal para definir la calidad
-de un vino, se suele encontrar en mayores niveles de éste en un buen
-vino que en un vino mediocre. Y para finalizar, dados los resultados del
-análisis de regresión son que podemos determinar con un buen nivel de
-precisión si se trata de un buen vino o no, haciendo uso de solamente 3
-componentes fisioquímicos.
+resultado el alcohol, sulfitos y acidez volátil.
+
+Luego mediante un análisis de contraste de hipótesis pudimos responder a
+la pregunta de si un buen vino suele tener mayor cantidad de alcohol, y
+la respuesta fue afirmativa, el alcohol como elemento principal para
+definir la calidad de un vino, se suele encontrar en mayores niveles de
+éste en un buen vino que en un vino mediocre.
+
+Y para finalizar, dados los resultados del análisis de regresión son que
+podemos determinar con un buen nivel de precisión si se trata de un buen
+vino o no, haciendo uso de solamente 3 componentes fisioquímicos.
